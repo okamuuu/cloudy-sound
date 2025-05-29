@@ -13,6 +13,23 @@ export const Player = ({ track }: PlayerProps) => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
 
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (audioRef.current) {
+      audioRef.current.muted = !isMuted;
+    }
+  };
+
+  const toggleLoop = () => {
+    setIsLooping(!isLooping);
+    if (audioRef.current) {
+      audioRef.current.loop = !isLooping;
+    }
+  };
+
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -98,6 +115,15 @@ export const Player = ({ track }: PlayerProps) => {
           {isPlaying ? "⏸" : "▶️"}
         </button>
 
+        {/* ミュートボタン */}
+        <button
+          onClick={toggleMute}
+          className="text-xl text-gray-600 hover:text-black"
+          title="ミュート"
+        >
+          {isMuted ? "🔇" : "🔊"}
+        </button>
+
         <input
           type="range"
           min={0}
@@ -126,7 +152,16 @@ export const Player = ({ track }: PlayerProps) => {
           />
         </div>
       </div>
-
+      {/* ループボタン */}
+      <button
+        onClick={toggleLoop}
+        className={`text-xl ${
+          isLooping ? "text-blue-500" : "text-gray-600"
+        } hover:text-black`}
+        title="ループ再生"
+      >
+        🔁
+      </button>
       <audio
         ref={audioRef}
         src={track.audioUrl}
