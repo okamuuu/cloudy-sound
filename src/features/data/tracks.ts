@@ -1,6 +1,6 @@
-import type { Track } from "../types";
+import type { TrackData } from "../types";
 
-export const tracks: Track[] = [
+export const tracks: TrackData[] = [
   {
     id: "1",
     title: "Meow Vibes",

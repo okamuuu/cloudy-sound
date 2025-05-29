@@ -9,7 +9,9 @@ export const Player = ({ track }: PlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(1); // 0〜1 の範囲
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -21,7 +23,9 @@ export const Player = ({ track }: PlayerProps) => {
       }
     }
     setProgress(0);
-  }, [isPlaying, track, volume]);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [track]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -37,6 +41,8 @@ export const Player = ({ track }: PlayerProps) => {
     if (!audioRef.current) return;
     const current = audioRef.current.currentTime;
     const total = audioRef.current.duration || 1;
+    setCurrentTime(current);
+    setDuration(total);
     setProgress((current / total) * 100);
   };
 
@@ -44,7 +50,9 @@ export const Player = ({ track }: PlayerProps) => {
     if (!audioRef.current) return;
     const percent = parseFloat(e.target.value);
     const total = audioRef.current.duration || 1;
-    audioRef.current.currentTime = (percent / 100) * total;
+    const newTime = (percent / 100) * total;
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
     setProgress(percent);
   };
 
@@ -54,6 +62,16 @@ export const Player = ({ track }: PlayerProps) => {
     if (audioRef.current) {
       audioRef.current.volume = vol;
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, "0");
+    return `${m}:${s}`;
   };
 
   if (!track) return null;
@@ -72,9 +90,7 @@ export const Player = ({ track }: PlayerProps) => {
         </div>
       </div>
 
-      {/* 再生・シークバー・音量コントロール */}
       <div className="flex-1 w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-2">
-        {/* 再生ボタン */}
         <button
           onClick={togglePlay}
           className="text-xl px-4 py-2 bg-gray-100 rounded hover:bg-gray-200"
@@ -82,7 +98,6 @@ export const Player = ({ track }: PlayerProps) => {
           {isPlaying ? "⏸" : "▶️"}
         </button>
 
-        {/* シークバー */}
         <input
           type="range"
           min={0}
@@ -92,7 +107,12 @@ export const Player = ({ track }: PlayerProps) => {
           className="w-full sm:w-48 accent-blue-500"
         />
 
-        {/* 音量スライダー */}
+        {/* 時間表示 */}
+        <div className="text-sm text-gray-600 w-24 text-center">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+
+        {/* 音量 */}
         <div className="flex items-center gap-2">
           <span className="text-gray-500 text-sm">🔉</span>
           <input
