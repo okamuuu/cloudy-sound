@@ -1,57 +1,26 @@
-import { BehaviorSubject, interval, fromEvent } from "rxjs";
-import { map, takeUntil, filter } from "rxjs/operators";
+import { Subject } from "rxjs";
 
-const audio = new Audio();
+export type AudioTypeData = "TIME_UPDATE" | "DURATION_CHANGE" | "ENDED";
 
-export const isPlaying$ = new BehaviorSubject(false);
-export const currentTime$ = new BehaviorSubject(0);
-export const duration$ = new BehaviorSubject(0);
-export const volume$ = new BehaviorSubject(1);
-export const track$ = new BehaviorSubject<string | null>(null); // audio URL
+export const audioEvents$ = new Subject<{
+  type: AudioTypeData;
+  value?: number;
+}>();
 
-// 再生処理
-export function play(url?: string) {
-  if (url && track$.value !== url) {
-    track$.next(url);
-    audio.src = url;
-    audio.load();
-  }
-  audio.play();
-  isPlaying$.next(true);
+export function setupAudioListeners(audio: HTMLAudioElement) {
+  const timeUpdate = () =>
+    audioEvents$.next({ type: "TIME_UPDATE", value: audio.currentTime });
+  const durationChange = () =>
+    audioEvents$.next({ type: "DURATION_CHANGE", value: audio.duration });
+  const ended = () => audioEvents$.next({ type: "ENDED" });
+
+  audio.addEventListener("timeupdate", timeUpdate);
+  audio.addEventListener("durationchange", durationChange);
+  audio.addEventListener("ended", ended);
+
+  return () => {
+    audio.removeEventListener("timeupdate", timeUpdate);
+    audio.removeEventListener("durationchange", durationChange);
+    audio.removeEventListener("ended", ended);
+  };
 }
-
-// 一時停止
-export function pause() {
-  audio.pause();
-  isPlaying$.next(false);
-}
-
-// シーク
-export function seek(to: number) {
-  audio.currentTime = to;
-  currentTime$.next(to);
-}
-
-// 音量調整
-export function setVolume(vol: number) {
-  audio.volume = vol;
-  volume$.next(vol);
-}
-
-// ミュート切り替え
-export function toggleMute() {
-  audio.muted = !audio.muted;
-}
-
-// イベント購読
-audio.addEventListener("timeupdate", () => {
-  currentTime$.next(audio.currentTime);
-});
-
-audio.addEventListener("loadedmetadata", () => {
-  duration$.next(audio.duration);
-});
-
-audio.addEventListener("ended", () => {
-  isPlaying$.next(false);
-});
