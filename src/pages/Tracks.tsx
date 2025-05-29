@@ -17,7 +17,7 @@ export const Tracks = () => {
       {tracks.map((track) => (
         <TrackCard key={track.id} track={track} onClick={setSelectedTrack} />
       ))}
-      {selectedTrack && <Player track={selectedTrack} />}
+      {selectedTrack?.audioUrl && <Player url={selectedTrack.audioUrl} />}
     </main>
   );
 };
