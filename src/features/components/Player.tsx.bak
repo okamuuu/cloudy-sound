@@ -1,0 +1,74 @@
+import { useEffect, useRef } from "react";
+
+import { useMachine } from "@xstate/react";
+import { playerMachine } from "../machines/playerMachine";
+
+export function Player() {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [state, send] = useMachine(playerMachine);
+
+  const isPlaying = state.matches("playing");
+  //   const isMuted = state.context.isMuted;
+  //   const volume = state.context.volume;
+  const currentTime = state.context.currentTime;
+  const duration = state.context.duration;
+
+  // オーディオ再生制御
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (state.matches("playing")) {
+      audio.play().catch(console.error); // 再生エラーも考慮
+    } else if (state.matches("paused")) {
+      audio.pause();
+    }
+  }, [state, state.value]);
+
+  //
+
+  return (
+    <>
+      <audio
+        ref={audioRef}
+        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" // 任意の音源に差し替えてください
+        onLoadedMetadata={(e) => {
+          const duration = e.currentTarget.duration;
+          send({ type: "loaded", duration });
+        }}
+        onTimeUpdate={(e) => {
+          const currentTime = e.currentTarget.currentTime;
+          send({ type: "updateTime", value: currentTime });
+        }}
+      />
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-4 flex flex-col">
+        <div className="flex items-center space-x-4">
+          <button onClick={() => send({ type: isPlaying ? "pause" : "play" })}>
+            {state.matches("playing") ? "Pause" : "Play"}
+          </button>
+
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            value={currentTime}
+            onChange={(e) =>
+              send({ type: "seek", value: Number(e.target.value) })
+            }
+            className="flex-grow"
+          />
+          <span>
+            {formatTime(state.context.currentTime)} /{" "}
+            {formatTime(state.context.duration)}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}

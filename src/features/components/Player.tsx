@@ -1,181 +1,100 @@
-import { useEffect, useRef, useState } from "react";
+// components/Player.tsx
+import { useEffect, useRef } from "react";
+import { useMachine } from "@xstate/react";
+import { playerMachine } from "../machines/playerMachine";
+import { PiPlayThin, PiPauseThin } from "react-icons/pi";
+
+import { SeekBar } from "./SeekBar";
+
 import type { TrackData } from "../types";
 
-type PlayerProps = {
-  track: TrackData | null;
-};
+export const Player = ({ track }: { track: TrackData }) => {
+  const [state, send] = useMachine(playerMachine);
+  const isPlaying = state.matches("playing");
+  const duration = state.context.duration;
+  const currentTime = state.context.currentTime;
 
-export const Player = ({ track }: PlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
 
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLooping, setIsLooping] = useState(false);
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    if (audioRef.current) {
-      audioRef.current.muted = !isMuted;
-    }
-  };
-
-  const toggleLoop = () => {
-    setIsLooping(!isLooping);
-    if (audioRef.current) {
-      audioRef.current.loop = !isLooping;
-    }
-  };
-
+  // ステート遷移で再生／停止制御
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.load();
-      audioRef.current.volume = volume;
-      audioRef.current.muted = isMuted;
-      audioRef.current.loop = isLooping;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-      // ✅ 自動再生
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.warn("Autoplay failed:", err);
-          setIsPlaying(false);
-        });
+    if (state.matches("playing")) {
+      audio.play().catch(console.error);
+    } else if (state.matches("paused")) {
+      audio.pause();
     }
+  }, [state, state.value]);
 
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-  }, [track]);
+  // トラック変更時に再ロード
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const current = audioRef.current.currentTime;
-    const total = audioRef.current.duration || 1;
-    setCurrentTime(current);
-    setDuration(total);
-    setProgress((current / total) * 100);
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current) return;
-    const percent = parseFloat(e.target.value);
-    const total = audioRef.current.duration || 1;
-    const newTime = (percent / 100) * total;
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-    setProgress(percent);
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseFloat(e.target.value);
-    setVolume(vol);
-    if (audioRef.current) {
-      audioRef.current.volume = vol;
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = Math.floor(seconds % 60)
-      .toString()
-      .padStart(2, "0");
-    return `${m}:${s}`;
-  };
-
-  if (!track) return null;
+    audio.load(); // 新しい src をロード
+    send({ type: "pause" }); // まず一時停止
+  }, [send, track.audioUrl]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-md p-4 flex flex-col sm:flex-row sm:items-center gap-4 z-50">
-      <div className="flex items-center gap-4 w-full sm:w-auto">
-        <img
-          src={track.coverUrl}
-          alt={track.title}
-          className="w-12 h-12 object-cover rounded"
-        />
-        <div>
-          <div className="font-medium">{track.title}</div>
-          <div className="text-sm text-gray-500">{track.artist}</div>
-        </div>
-      </div>
-
-      <div className="flex-1 w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-2">
-        <button
-          onClick={togglePlay}
-          className="text-xl px-4 py-2 bg-gray-100 rounded hover:bg-gray-200"
-        >
-          {isPlaying ? "⏸" : "▶️"}
-        </button>
-
-        {/* ミュートボタン */}
-        <button
-          onClick={toggleMute}
-          className="text-xl text-gray-600 hover:text-black"
-          title="ミュート"
-        >
-          {isMuted ? "🔇" : "🔊"}
-        </button>
-
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={progress}
-          onChange={handleSeek}
-          className="w-full sm:w-48 accent-blue-500"
-        />
-
-        {/* 時間表示 */}
-        <div className="text-sm text-gray-600 w-24 text-center">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </div>
-
-        {/* 音量 */}
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500 text-sm">🔉</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={handleVolumeChange}
-            className="w-24 accent-blue-500"
-          />
-        </div>
-      </div>
-      {/* ループボタン */}
-      <button
-        onClick={toggleLoop}
-        className={`text-xl ${
-          isLooping ? "text-blue-500" : "text-gray-600"
-        } hover:text-black`}
-        title="ループ再生"
-      >
-        🔁
-      </button>
+    <>
+      {/* オーディオ */}
       <audio
         ref={audioRef}
         src={track.audioUrl}
-        onTimeUpdate={handleTimeUpdate}
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const duration = e.currentTarget.duration;
+          send({ type: "loaded", duration });
+        }}
+        onTimeUpdate={(e) => {
+          const currentTime = e.currentTarget.currentTime;
+          send({ type: "updateTime", value: currentTime });
+        }}
       />
-    </div>
+      {/* Music Playser */}
+      <div>
+        <div className="flex flex-col w-full w-full bg-white rounded-xl p-4 flex items-center gap-2 border border-black/10">
+          <div className="flex items-center gap-4 p-4 w-full">
+            <div className="group relative w-16 h-16 rounded-full overflow-hidden shadow-md border-2 border-black/30">
+              <img
+                src={track.coverUrl}
+                alt={track.artist}
+                className="h-full object-cover hover:scale-110 transition-transform duration-300"
+              />
+              <button
+                className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                onClick={() => send({ type: isPlaying ? "pause" : "play" })}
+              >
+                {isPlaying ? (
+                  <PiPauseThin className="w-6 h-6" />
+                ) : (
+                  <PiPlayThin className="w-6 h-6" />
+                )}
+              </button>
+            </div>
+            <div className="w-auto flex flex-col gap-1 leading-tight">
+              {/* <span className="text-xs text-center uppercase text-gray-500 tracking-wide">
+                now playing
+              </span> */}
+              <div className="text-left text-sm font-semibold text-gray-400 truncate">
+                {track.artist}
+              </div>
+              <div className="text-left text-sm text-gray-300 truncate">
+                {track.title}
+              </div>
+            </div>
+          </div>
+          <div className="w-full flex items-center px-4">
+            <SeekBar
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={(value) => send({ type: "seek", value })}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
