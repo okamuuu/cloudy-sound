@@ -35,10 +35,19 @@ export const Player = ({ track }: PlayerProps) => {
       audioRef.current.pause();
       audioRef.current.load();
       audioRef.current.volume = volume;
-      if (isPlaying) {
-        audioRef.current.play();
-      }
+      audioRef.current.muted = isMuted;
+      audioRef.current.loop = isLooping;
+
+      // ✅ 自動再生
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.warn("Autoplay failed:", err);
+          setIsPlaying(false);
+        });
     }
+
     setProgress(0);
     setCurrentTime(0);
     setDuration(0);
