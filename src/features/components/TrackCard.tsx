@@ -1,13 +1,16 @@
-export type Track = {
-  id: string;
-  title: string;
-  artist: string;
-  coverUrl: string;
+import type { TrackData } from "../types";
+
+type Props = {
+  track: TrackData;
+  onClick: (track: TrackData) => void;
 };
 
-export const TrackCard = ({ track }: { track: Track }) => {
+export const TrackCard = ({ track, onClick }: Props) => {
   return (
-    <div className="flex items-center gap-4 p-4 rounded-xl bg-white shadow hover:bg-gray-100">
+    <button
+      onClick={() => onClick(track)}
+      className="w-full text-left flex items-center gap-4 p-4 rounded-xl bg-white shadow hover:bg-gray-100"
+    >
       <img
         src={track.coverUrl}
         alt={track.title}
@@ -17,6 +20,6 @@ export const TrackCard = ({ track }: { track: Track }) => {
         <h3 className="text-lg font-semibold">{track.title}</h3>
         <p className="text-gray-500">{track.artist}</p>
       </div>
-    </div>
+    </button>
   );
 };
