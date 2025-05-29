@@ -3,4 +3,5 @@ export type TrackData = {
   title: string;
   artist: string;
   coverUrl: string;
+  audioUrl: string;
 };

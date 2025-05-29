@@ -1,70 +1,100 @@
+// components/Player.tsx
 import { useEffect, useRef } from "react";
-import { audioEvents$, setupAudioListeners } from "../services/playerService";
-
 import { useMachine } from "@xstate/react";
 import { playerMachine } from "../machines/playerMachine";
+import { PiPlayThin, PiPauseThin } from "react-icons/pi";
 
-export function Player() {
+import { SeekBar } from "./SeekBar";
+
+import type { TrackData } from "../types";
+
+export const Player = ({ track }: { track: TrackData }) => {
   const [state, send] = useMachine(playerMachine);
   const isPlaying = state.matches("playing");
-  const isMuted = state.context.isMuted;
-  const volume = state.context.volume;
-  const currentTime = state.context.currentTime;
   const duration = state.context.duration;
+  const currentTime = state.context.currentTime;
 
-  //
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // ステート遷移で再生／停止制御
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (state.matches("playing")) {
+      audio.play().catch(console.error);
+    } else if (state.matches("paused")) {
+      audio.pause();
+    }
+  }, [state, state.value]);
+
+  // トラック変更時に再ロード
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.load(); // 新しい src をロード
+    send({ type: "pause" }); // まず一時停止
+  }, [send, track.audioUrl]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-4 flex flex-col">
-      <div className="flex items-center space-x-4">
-        <button onClick={() => send({ type: isPlaying ? "pause" : "play" })}>
-          {state.matches("playing") ? "Pause" : "Play"}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={state.context.duration || 0}
-          value={state.context.currentTime}
-          onChange={(e) =>
-            send({ type: "seek", value: Number(e.target.value) })
-          }
-          className="flex-grow"
-        />
-        <span>
-          {formatTime(state.context.currentTime)} /{" "}
-          {formatTime(state.context.duration)}
-        </span>
-        {/* <button onClick={() => send({ type: "TOGGLE_MUTE" })}>
-          {state.context.isMuted ? "Unmute" : "Mute"}
-        </button>
-        <button
-          onClick={() => send({ type: "TOGGLE_LOOP" })}
-          className={
-            state.context.loop
-              ? "bg-green-600 px-2 py-1 rounded"
-              : "bg-gray-700 px-2 py-1 rounded"
-          }
-        >
-          Loop
-        </button> */}
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={state.context.volume}
-        onChange={(e) =>
-          send({ type: "CHANGE_VOLUME", value: Number(e.target.value) })
-        }
-        className="mt-2"
+    <>
+      {/* オーディオ */}
+      <audio
+        ref={audioRef}
+        src={track.audioUrl}
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const duration = e.currentTarget.duration;
+          send({ type: "loaded", duration });
+        }}
+        onTimeUpdate={(e) => {
+          const currentTime = e.currentTarget.currentTime;
+          send({ type: "updateTime", value: currentTime });
+        }}
       />
-    </div>
+      {/* Music Playser */}
+      <div>
+        <div className="flex flex-col w-full w-full bg-white rounded-xl p-4 flex items-center gap-2 border border-black/10">
+          <div className="flex items-center gap-4 p-4 w-full">
+            <div className="group relative w-16 h-16 rounded-full overflow-hidden shadow-md border-2 border-black/30">
+              <img
+                src={track.coverUrl}
+                alt={track.artist}
+                className="h-full object-cover hover:scale-110 transition-transform duration-300"
+              />
+              <button
+                className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                onClick={() => send({ type: isPlaying ? "pause" : "play" })}
+              >
+                {isPlaying ? (
+                  <PiPauseThin className="w-6 h-6" />
+                ) : (
+                  <PiPlayThin className="w-6 h-6" />
+                )}
+              </button>
+            </div>
+            <div className="w-auto flex flex-col gap-1 leading-tight">
+              {/* <span className="text-xs text-center uppercase text-gray-500 tracking-wide">
+                now playing
+              </span> */}
+              <div className="text-left text-sm font-semibold text-gray-400 truncate">
+                {track.artist}
+              </div>
+              <div className="text-left text-sm text-gray-300 truncate">
+                {track.title}
+              </div>
+            </div>
+          </div>
+          <div className="w-full flex items-center px-4">
+            <SeekBar
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={(value) => send({ type: "seek", value })}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
+};
