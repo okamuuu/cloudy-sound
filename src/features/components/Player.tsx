@@ -1,8 +1,10 @@
-// components/Player.tsx
 import { useEffect, useRef } from "react";
 import { useMachine } from "@xstate/react";
 import { playerMachine } from "../machines/playerMachine";
 import { PiPlayThin, PiPauseThin } from "react-icons/pi";
+
+import { Subject } from "rxjs";
+import { debounceTime } from "rxjs/operators";
 
 import { SeekBar } from "./SeekBar";
 
@@ -13,6 +15,23 @@ export const Player = ({ track }: { track: TrackData }) => {
   const isPlaying = state.matches("playing");
   const duration = state.context.duration;
   const currentTime = state.context.currentTime;
+  const lastSeekSource = state.context.lastSeekSource;
+
+  // seekSubjectはユーザーのシーク操作用
+  const seekSubject = useRef(new Subject<number>()).current;
+  useEffect(() => {
+    const sub = seekSubject.pipe(debounceTime(10)).subscribe((time) => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = time;
+      }
+    });
+    return () => sub.unsubscribe();
+  }, [seekSubject]);
+
+  function handleChangeSeek(value: number) {
+    const time = value;
+    seekSubject.next(time); // audioのcurrentTime更新はdebounce後に
+  }
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -21,25 +40,36 @@ export const Player = ({ track }: { track: TrackData }) => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (state.matches("playing")) {
+    if (isPlaying) {
       audio.play().catch(console.error);
-    } else if (state.matches("paused")) {
+    } else {
       audio.pause();
     }
-  }, [state, state.value]);
+  }, [isPlaying]);
 
   // トラック変更時に再ロード
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.load(); // 新しい src をロード
-    send({ type: "pause" }); // まず一時停止
+    audio.load();
+    send({ type: "play" });
   }, [send, track.audioUrl]);
+
+  // currentTime を監視する
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (lastSeekSource !== "user") {
+      return;
+    }
+    audio.currentTime = currentTime;
+  }, [currentTime, lastSeekSource]);
 
   return (
     <>
-      {/* オーディオ */}
+      {/* Audio */}
       <audio
         ref={audioRef}
         src={track.audioUrl}
@@ -50,10 +80,10 @@ export const Player = ({ track }: { track: TrackData }) => {
         }}
         onTimeUpdate={(e) => {
           const currentTime = e.currentTarget.currentTime;
-          send({ type: "updateTime", value: currentTime });
+          send({ type: "tick", value: currentTime, source: "system" });
         }}
       />
-      {/* Music Playser */}
+      {/* Player */}
       <div>
         <div className="flex flex-col w-full w-full bg-white rounded-xl p-4 flex items-center gap-2 border border-black/10">
           <div className="flex items-center gap-4 p-4 w-full">
@@ -75,9 +105,6 @@ export const Player = ({ track }: { track: TrackData }) => {
               </button>
             </div>
             <div className="w-auto flex flex-col gap-1 leading-tight">
-              {/* <span className="text-xs text-center uppercase text-gray-500 tracking-wide">
-                now playing
-              </span> */}
               <div className="text-left text-sm font-semibold text-gray-400 truncate">
                 {track.artist}
               </div>
@@ -90,7 +117,8 @@ export const Player = ({ track }: { track: TrackData }) => {
             <SeekBar
               currentTime={currentTime}
               duration={duration}
-              onSeek={(value) => send({ type: "seek", value })}
+              //   onSeek={(value) => send({ type: "seek", value, source: "user" })}
+              onSeek={handleChangeSeek}
             />
           </div>
         </div>

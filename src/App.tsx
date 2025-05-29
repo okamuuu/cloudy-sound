@@ -12,6 +12,7 @@ function App() {
         Cloudy Sound
       </h1>
       <Tracks />
+      <small>Music : RYU ITO https://ryu110.com/</small>
     </>
   );
 }
