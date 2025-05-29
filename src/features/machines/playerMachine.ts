@@ -8,6 +8,7 @@ export interface PlayerContext {
   volume: number;
   currentTime: number;
   duration: number;
+  lastSeekSource: string;
 }
 
 export type PlayerEvent =
@@ -16,7 +17,8 @@ export type PlayerEvent =
   | { type: "toggleMute" }
   | { type: "toggleLoop" }
   | { type: "changeVolume"; value: number }
-  | { type: "seek"; value: number }
+  | { type: "tick"; value: number; source: "system" }
+  | { type: "seek"; value: number; source: "user" }
   | { type: "loaded"; duration: number }
   | { type: "updateTime"; value: number };
 
@@ -27,6 +29,7 @@ export const player$ = new BehaviorSubject<PlayerContext & { state: string }>({
   volume: 1,
   currentTime: 0,
   duration: 0,
+  lastSeekSource: "",
   state: "paused",
 });
 
@@ -50,6 +53,7 @@ export const playerMachine = setup({
     volume: 1,
     currentTime: 0,
     duration: 0,
+    lastSeekSource: "",
   },
   states: {
     playing: {
@@ -85,19 +89,21 @@ export const playerMachine = setup({
         volume: ({ event }) => event.value,
       }),
     },
+    tick: {
+      actions: assign({
+        currentTime: ({ event }) => event.value,
+        lastSeekSource: ({ event }) => event.source ?? "system",
+      }),
+    },
     seek: {
       actions: assign({
         currentTime: ({ event }) => event.value,
+        lastSeekSource: ({ event }) => event.source ?? "user",
       }),
     },
     loaded: {
       actions: assign({
         duration: ({ event }) => event.duration,
-      }),
-    },
-    updateTime: {
-      actions: assign({
-        currentTime: ({ event }) => event.value,
       }),
     },
   },
